@@ -63,8 +63,7 @@
     </div>
 
     <script>
-        // 将时间从 180 调整为 165 (2分45秒)
-        let totalTime = 165;
+        const totalTime = 165; // 2分45秒
         let timeLeft = totalTime;
         let timerId = null;
         let isLooping = false;
@@ -101,15 +100,24 @@
 
         function toggleTimer() {
             if (timerId) {
+                // 暂停
                 clearInterval(timerId);
                 timerId = null;
                 btnText.innerText = "继续铺路";
                 btnIcon.innerText = "▶";
                 startBtn.classList.replace('bg-orange-600', 'bg-blue-600');
             } else {
+                // 开始/恢复
+                // BUG 修复: 如果当前时间已经到 0，点击开始时先重置时间
+                if (timeLeft <= 0) {
+                    timeLeft = totalTime;
+                    updateDisplay();
+                }
+
                 startBtn.classList.replace('bg-blue-600', 'bg-orange-600');
                 btnText.innerText = "点击暂停";
                 btnIcon.innerText = "⏸";
+                
                 timerId = setInterval(() => {
                     timeLeft--;
                     updateDisplay();
@@ -133,8 +141,10 @@
             if (isLooping) {
                 timeLeft = totalTime;
                 updateDisplay();
-                toggleTimer(); // 自动下一格
+                toggleTimer(); // 自动进入下一轮
             } else {
+                timeLeft = 0; // 明确设为0
+                updateDisplay();
                 resetUI();
             }
         }
@@ -183,6 +193,7 @@
             loopBtn.classList.toggle('bg-blue-900/30');
         }
 
+        // 初始化显示
         updateDisplay();
     </script>
 </body>
