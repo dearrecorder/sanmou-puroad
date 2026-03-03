@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三谋铺路助手 - 2分45秒精准提醒</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap');
+        .timer-font { font-family: 'JetBrains+Mono', monospace; }
+        .progress-ring { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- 主卡片 -->
+    <div class="w-full max-w-md bg-slate-800 rounded-3xl p-8 shadow-2xl border border-slate-700 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-blue-500 opacity-50"></div>
+        
+        <h1 class="text-2xl font-bold text-center mb-2 text-blue-400">三谋铺路助手</h1>
+        <p class="text-slate-400 text-center text-sm mb-8">单格铺路时间（预留操作）：2分45秒</p>
+
+        <!-- 倒计时圆环 -->
+        <div class="relative flex items-center justify-center mb-8">
+            <svg class="w-64 h-64">
+                <circle class="text-slate-700" stroke-width="8" stroke="currentColor" fill="transparent" r="120" cx="128" cy="128" />
+                <circle id="progress" class="text-blue-500 progress-ring" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="120" cx="128" cy="128" stroke-dasharray="753.98" stroke-dashoffset="0" />
+            </svg>
+            <div id="display" class="absolute text-6xl font-bold timer-font tracking-tighter">02:45</div>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <button id="startBtn" onclick="toggleTimer()" class="col-span-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                <span id="btnIcon">▶</span> <span id="btnText">开始铺路</span>
+            </button>
+            <button onclick="resetTimer()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl font-medium transition-colors">重置</button>
+            <button id="loopBtn" onclick="toggleLoop()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl font-medium transition-colors border-2 border-transparent">
+                循环: <span id="loopStatus">关</span>
+            </button>
+        </div>
+
+        <!-- 设置与状态 -->
+        <div class="space-y-3 border-t border-slate-700 pt-6">
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-400">提醒方式</span>
+                <select id="voiceType" class="bg-slate-700 text-white rounded px-2 py-1 outline-none">
+                    <option value="voice">语音播报</option>
+                    <option value="beep">蜂鸣声</option>
+                    <option value="none">仅通知</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-400">已铺路格数</span>
+                <span id="counter" class="text-blue-400 font-bold">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示信息 -->
+    <div id="toast" class="fixed bottom-10 bg-blue-500 text-white px-6 py-3 rounded-full shadow-xl opacity-0 transition-opacity pointer-events-none">
+        铺路预定时间到，请操作下一格！
+    </div>
+
+    <script>
+        // 将时间从 180 调整为 165 (2分45秒)
+        let totalTime = 165;
+        let timeLeft = totalTime;
+        let timerId = null;
+        let isLooping = false;
+        let count = 0;
+        const circleLength = 2 * Math.PI * 120;
+
+        const display = document.getElementById('display');
+        const progress = document.getElementById('progress');
+        const btnText = document.getElementById('btnText');
+        const btnIcon = document.getElementById('btnIcon');
+        const startBtn = document.getElementById('startBtn');
+        const loopStatus = document.getElementById('loopStatus');
+        const loopBtn = document.getElementById('loopBtn');
+        const counterDisplay = document.getElementById('counter');
+        const toast = document.getElementById('toast');
+
+        function updateDisplay() {
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            display.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            // 更新进度条
+            const offset = circleLength - (timeLeft / totalTime) * circleLength;
+            progress.style.strokeDashoffset = offset;
+
+            if (timeLeft <= 10) {
+                display.classList.add('text-red-500');
+                progress.classList.replace('text-blue-500', 'text-red-500');
+            } else {
+                display.classList.remove('text-red-500');
+                progress.classList.replace('text-red-500', 'text-blue-500');
+            }
+        }
+
+        function toggleTimer() {
+            if (timerId) {
+                clearInterval(timerId);
+                timerId = null;
+                btnText.innerText = "继续铺路";
+                btnIcon.innerText = "▶";
+                startBtn.classList.replace('bg-orange-600', 'bg-blue-600');
+            } else {
+                startBtn.classList.replace('bg-blue-600', 'bg-orange-600');
+                btnText.innerText = "点击暂停";
+                btnIcon.innerText = "⏸";
+                timerId = setInterval(() => {
+                    timeLeft--;
+                    updateDisplay();
+                    if (timeLeft <= 0) {
+                        handleFinish();
+                    }
+                }, 1000);
+            }
+        }
+
+        function handleFinish() {
+            clearInterval(timerId);
+            timerId = null;
+            count++;
+            counterDisplay.innerText = count;
+            
+            // 提醒逻辑
+            playAlert();
+            showToast();
+
+            if (isLooping) {
+                timeLeft = totalTime;
+                updateDisplay();
+                toggleTimer(); // 自动下一格
+            } else {
+                resetUI();
+            }
+        }
+
+        function playAlert() {
+            const type = document.getElementById('voiceType').value;
+            if (type === 'voice') {
+                const msg = new SpeechSynthesisUtterance("到时间了，准备铺下一格！");
+                msg.lang = 'zh-CN';
+                window.speechSynthesis.speak(msg);
+            } else if (type === 'beep') {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            }
+        }
+
+        function showToast() {
+            toast.style.opacity = "1";
+            setTimeout(() => toast.style.opacity = "0", 3000);
+        }
+
+        function resetTimer() {
+            clearInterval(timerId);
+            timerId = null;
+            timeLeft = totalTime;
+            updateDisplay();
+            resetUI();
+        }
+
+        function resetUI() {
+            btnText.innerText = "开始铺路";
+            btnIcon.innerText = "▶";
+            startBtn.classList.replace('bg-orange-600', 'bg-blue-600');
+        }
+
+        function toggleLoop() {
+            isLooping = !isLooping;
+            loopStatus.innerText = isLooping ? "开" : "关";
+            loopBtn.classList.toggle('border-blue-500');
+            loopBtn.classList.toggle('bg-slate-700');
+            loopBtn.classList.toggle('bg-blue-900/30');
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
